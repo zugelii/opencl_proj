@@ -87,8 +87,8 @@ int32_t get_device_info(cl_device_id &device_id)
 
 
 	clGetDeviceInfo(device_id, CL_DEVICE_NAME, len, &buf[0], &len);
-	printf("device name : %s\n", &buf[0]);
-	printf("device has max memory :%u MB\n", max_mem_size / 1048576);
+	printf("The device name : %s\n", &buf[0]);
+	printf("The device has max memory :%u MB\n", max_mem_size / 1048576);
 
 	printf("Max work-item dimensions   : %d\n", work_item_dim);
 	printf("Max work-item sizes        : %d %d %d\n", work_item_sizes[0], work_item_sizes[1], work_item_sizes[2]);
@@ -106,13 +106,9 @@ int32_t get_plateform_info(cl_platform_id &plt_id)
 	cl_uint gpu_num = 0;
 	cl_int status;
 	clGetDeviceIDs(plt_id, CL_DEVICE_TYPE_GPU, 0, nullptr, &gpu_num);
-
-
-	pf("plate has ", gpu_num);
 	cl_uint cpu_num = 0;
 	clGetDeviceIDs(plt_id, CL_DEVICE_TYPE_CPU, 0, nullptr, &cpu_num);
-	pf("plate has ", cpu_num);
-
+	printf("\tThe platform has GPU: %d, CPU: %d\n", gpu_num, cpu_num);
 	//name
 	status = clGetPlatformInfo(plt_id, CL_PLATFORM_NAME, 0, NULL, &size);
 	char* name = (char*)malloc(size);
@@ -153,18 +149,42 @@ int32_t get_plateform_info(cl_platform_id &plt_id)
 	return 0;
 }
 
+int32_t get_context_info(cl_context &con_id)
+{
+	size_t  device_num;
+	clGetContextInfo(con_id, CL_CONTEXT_NUM_DEVICES, 0, NULL, &device_num);
+	printf("Size of cl_device_id:%d\n", sizeof(cl_device_id));
+	printf("this context has :%d device\n", device_num);
+/*
+	cl_int errNum;
+	size_t size = device_num;
+	int c = 0;
+
+	vector<cl_device_id> did(device_num);
+	errNum = clGetContextInfo(con_id, CL_CONTEXT_DEVICES, size, &did[0], NULL);
+	for (auto gpuinfor : did)
+	{
+		printf("get_context_info  device %d's information:\n", c++);
+		get_device_info(gpuinfor);
+	}
+	*/
+	return 0;
+}
+
 
 void opencl_test(cl_platform_id& platforms)
 {
-	int *A = NULL;
-	int *B = NULL;
-	int *C = NULL;
+//	int *A = NULL;
+//	int *B = NULL;
+//	int *C = NULL;
 	const  int elements = 128;
 	size_t datasize = sizeof(int)*elements;
-	pf("len ", datasize);
-	A = (int*)malloc(datasize);
-	B = (int*)malloc(datasize);
-	C = (int*)malloc(datasize);
+	//auto A = (int*)malloc(datasize);
+	//auto B = (int*)malloc(datasize);
+	//auto C = (int*)malloc(datasize);
+	auto A = new int(elements);
+	auto B = new int(elements);
+	auto C = new int(elements);
 	for (int i = 0; i < elements; i++)
 	{
 		A[i] = i;
@@ -174,24 +194,35 @@ void opencl_test(cl_platform_id& platforms)
 	/*Discover and initialize the platforms*/
 	/*Discover and initialize devices*/
 	cl_uint numDevices = 0;
-	cl_device_id* devices = NULL;
+//	cl_device_id* devices = NULL;
 	status = clGetDeviceIDs(platforms, CL_DEVICE_TYPE_GPU, 0, NULL, &numDevices);  // retrieve Device number
-	printf("# of device:%d\n", numDevices);
-	devices = (cl_device_id*)malloc(numDevices * sizeof(cl_device_id)); // malloct memery for device
-	status = clGetDeviceIDs(platforms, CL_DEVICE_TYPE_GPU, numDevices, devices, NULL); // fill in device 
+	if (status != CL_SUCCESS)
+	{
+		printf("get devices counts error:%d\n", status);
+	}
+	printf("The platforms has %d device\n", numDevices);
+//	auto devices = (cl_device_id*)malloc(numDevices * sizeof(cl_device_id)); // malloct memery for device
+//	auto devices = new cl_device_id(numDevices);
+	vector<cl_device_id>devices(numDevices);
+	status = clGetDeviceIDs(platforms, CL_DEVICE_TYPE_GPU, numDevices, &devices[0], NULL); // fill in device 
+	if (CL_SUCCESS != status)
+	{
+		printf("fill device error: %d\n", status);
+	}
 	/*Creat a context*/
 	cl_context context = NULL;
-	context = clCreateContext(NULL, numDevices, devices, NULL, NULL, &status);
+	context = clCreateContext(NULL, numDevices, &devices[0], NULL, NULL, &status);
 	//  context = clCreateContextFromType(NULL,CL_DEVICE_TYPE_ALL,NULL,NULL,&status);
 	//  cl_device_id device_list;
-	size_t  device_num;
-	clGetContextInfo(context, CL_CONTEXT_NUM_DEVICES, 0, NULL, &device_num);
-	printf("Size of cl_device_id:%d\n", sizeof(cl_device_id));
-	printf("Num of device in Context:%d\n", device_num);
+	//get_context_info(context);
 	//  device_list = clGetContextInfo(context, CL_CONTEXT_DEVICES, 0, NULL, &device_list);
 	/*Create a command queue*/
 	cl_command_queue cmdQueue;
 	cmdQueue = clCreateCommandQueue(context, devices[0], 0, &status);
+	if (CL_SUCCESS != status)
+	{
+		printf("create command queue error: %\n", status);
+	}
 	/*Create device buffers*/
 	cl_mem bufferA;
 	cl_mem bufferB;
@@ -205,7 +236,7 @@ void opencl_test(cl_platform_id& platforms)
 	//status = clEnqueueWriteBuffer(cmdQueue,bufferC,CL_FALSE,0,datasize,C,0,NULL,NULL);
 	/*Create and compile the program*/
 	cl_program program = clCreateProgramWithSource(context, 1, (const char **)&programSource, NULL, &status);
-	status = clBuildProgram(program, numDevices, devices, NULL, NULL, NULL);
+	status = clBuildProgram(program, numDevices, &devices[0], NULL, NULL, NULL);
 	if (status != CL_SUCCESS)
 	{
 		size_t len;
@@ -269,10 +300,10 @@ void opencl_test(cl_platform_id& platforms)
 	clReleaseMemObject(bufferB);
 	clReleaseMemObject(bufferC);
 	clReleaseContext(context);
-	free(A);
-	free(B);
-	free(C);
-	free(devices);
+//	free(A);
+//	free(B);
+//	free(C);
+//	free(devices);
 	//getchar();
 }
 
@@ -286,30 +317,30 @@ int main()
 		cout << "get pl num" << endl;
 		exit(1);
 	}
-	pf("platforms has ", num);
+	printf("PC has %d platforms\n", num);
 	vector<cl_platform_id> platforms(num);
 	err = clGetPlatformIDs(num, &platforms[0], &num);
 	if (err != CL_SUCCESS)
 	{
-		cout << "get plateform" << endl;
+		cout << "get platform error :" << err << endl;
 		exit(1);
 	}
 	//for (auto it = platforms.begin(); it != platforms.end(); it++)
 	for (auto platform_info : platforms)
 	{
 		get_plateform_info(platform_info);
-		cl_uint gpu_num = 0;
-		clGetDeviceIDs(platform_info, CL_DEVICE_TYPE_GPU, 0, nullptr, &gpu_num);
-		vector<cl_device_id> did(gpu_num);
-		clGetDeviceIDs(platform_info, CL_DEVICE_TYPE_GPU, gpu_num, &did[0], &gpu_num);
-		uint8_t device_num = 1;
+		cl_uint gpu_device_num = 0;
+		clGetDeviceIDs(platform_info, CL_DEVICE_TYPE_GPU, 0, nullptr, &gpu_device_num);
+		vector<cl_device_id> did(gpu_device_num);
+		clGetDeviceIDs(platform_info, CL_DEVICE_TYPE_GPU, gpu_device_num, &did[0], &gpu_device_num);
+		uint8_t cnt = 0;
 		for (auto gpuinfor : did)
 		{
-			printf("get device %d's information:\n", device_num++);
+			printf("\tGPU device%d's information:\n", cnt++);
 			get_device_info(gpuinfor);
 		}
-		printf("\n\n\n\n\n");
 		opencl_test(platform_info);
+		printf("\n\n\n\n\n");
 	}
 	system("pause");
 }
